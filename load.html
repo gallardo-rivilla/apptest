@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cargar preguntas (CSV/JSON) → Index</title>
+  <style>
+    :root{--bg:#0b1020;--surface:#121833;--text:#e7ecf5;--muted:#9aa5bf;--border:#26305c;--accent:#8a9bff}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif}
+    .wrap{max-width:720px;margin:40px auto;padding:20px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+    h1{margin:0 0 12px 0;font-size:1.35rem}
+    p{color:var(--muted);margin:.5rem 0 1rem}
+    label.btn{display:inline-flex;gap:10px;align-items:center;border:1px dashed var(--border);padding:12px 14px;border-radius:10px;cursor:pointer}
+    input[type=file]{display:none}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+    .pill{border:1px solid var(--border);background:#0f1736;color:var(--text);padding:6px 10px;border-radius:999px}
+    button{border:1px solid var(--border);background:linear-gradient(180deg,var(--accent),#5fb4ff);color:#081028;
+      padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}
+    .log{white-space:pre-wrap;background:#0f1736;border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:12px;min-height:100px}
+    a{color:#9bb4ff}
+    .bad{color:#ffb4b4}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Importar preguntas (CSV/JSON) → Index</h1>
+      <p>CSV con cabeceras: <code>question,A,B,C,D,answer</code> (opcionales: <code>id,explanation,tags,difficulty</code>). Soporta comillas y separador <code>,</code> o <code>;</code>.</p>
+      <div class="row">
+        <label class="btn">
+          <input id="file" type="file" accept=".csv,.json" />
+          📥 Elegir archivo
+        </label>
+        <span class="pill" id="fname">Ningún archivo</span>
+        <span class="pill">Destino: <code>index.html</code></span>
+      </div>
+      <div class="row">
+        <label class="pill">Cant. preguntas
+          <select id="limit" class="pill" style="margin-left:8px;background:none;border:none;padding:0 4px;">
+            <option value="0" selected>Todo</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </label>
+        <button id="go">Cargar y abrir index →</button>
+      </div>
+      <div class="log" id="log">Esperando archivo…</div>
+    </div>
+  </div>
+
+<script>
+const $ = s => document.querySelector(s);
+const log = (msg) => { $('#log').innerHTML = msg; };
+
+function readText(file){ return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsText(file,'utf-8'); }); }
+
+function detectDelimiter(sample){
+  const comma = (sample.match(/,/g)||[]).length;
+  const semi  = (sample.match(/;/g)||[]).length;
+  return semi>comma ? ';' : ',';
+}
+
+// Robust CSV parser (handles quotes, escaped quotes, CRLF).
+// Returns array of rows (arrays of fields).
+function parseCSVRaw(text, delim){
+  const rows = [];
+  let cur = [], field = '', i=0, inQuotes=false;
+  while(i < text.length){
+    const ch = text[i];
+    if(inQuotes){
+      if(ch === '"'){
+        const next = text[i+1];
+        if(next === '"'){ field += '"'; i+=2; continue; } // escaped quote
+        inQuotes = false; i++; continue;
+      }else{ field += ch; i++; continue; }
+    }else{
+      if(ch === '"'){ inQuotes = true; i++; continue; }
+      if(ch === '\r'){ i++; continue; }
+      if(ch === '\n'){
+        cur.push(field); rows.push(cur); cur = []; field=''; i++; continue;
+      }
+      if(ch === delim){
+        cur.push(field); field=''; i++; continue;
+      }
+      field += ch; i++;
+    }
+  }
+  // last field
+  cur.push(field);
+  rows.push(cur);
+  // drop trailing empty row if file ended with newline
+  if(rows.length && rows[rows.length-1].length===1 && rows[rows.length-1][0]===''){ rows.pop(); }
+  return rows;
+}
+
+function normalizeHeaders(arr){
+  return arr.map(h => (h||'').toString().trim().toLowerCase());
+}
+
+function toQuestions(rows){
+  if(!rows.length) throw new Error('CSV vacío');
+  const headers = normalizeHeaders(rows[0]);
+  const req = ['question','a','b','c','d','answer'];
+  for(const r of req){
+    if(!headers.includes(r)) throw new Error('Faltan cabeceras obligatorias: ' + req.join(', '));
+  }
+  const idx = (name) => headers.indexOf(name);
+  const c = {
+    id: idx('id'),
+    q: idx('question'),
+    A: idx('a'),
+    B: idx('b'),
+    C: idx('c'),
+    D: idx('d'),
+    ans: idx('answer'),
+    expl: idx('explanation'),
+    tags: idx('tags'),
+    diff: idx('difficulty'),
+  };
+
+  const out = [];
+  for(let i=1;i<rows.length;i++){
+    const row = rows[i];
+    // skip empty lines
+    if(row.every(x => !x || !x.trim || !x.trim())) continue;
+    const get = (k) => (row[k]!==undefined ? String(row[k]).trim() : '');
+    const answerRaw = get(c.ans).toUpperCase().replace(/[^A-D]/g,'');
+    const answer = answerRaw ? answerRaw[0] : '';
+    const question = get(c.q);
+    const A = get(c.A), B=get(c.B), C=get(c.C), D=get(c.D);
+    if(!(question && A && B && C && D && /[A-D]/.test(answer))){
+      // collect error info
+      out.push({__error:true, row:i+1, question, A, B, C, D, answer:get(c.ans)});
+      continue;
+    }
+    const tags = c.tags>=0 && get(c.tags) ? get(c.tags).split('|').map(s=>s.trim()).filter(Boolean) : [];
+    out.push({
+      id: c.id>=0 ? get(c.id) : 'ROW-'+i,
+      question,
+      options: [{key:'A',text:A},{key:'B',text:B},{key:'C',text:C},{key:'D',text:D}],
+      answer,
+      explanation: c.expl>=0 ? get(c.expl) : '',
+      tags,
+      difficulty: c.diff>=0 ? get(c.diff).toLowerCase() : ''
+    });
+  }
+  return out;
+}
+
+let chosenFile = null;
+$('#file').addEventListener('change', (e)=>{
+  chosenFile = e.target.files[0] || null;
+  $('#fname').textContent = chosenFile ? chosenFile.name : 'Ningún archivo';
+  log(chosenFile ? 'Archivo seleccionado. Pulsa "Cargar y abrir index →"' : 'Esperando archivo…');
+});
+
+$('#go').addEventListener('click', async ()=>{
+  if(!chosenFile){ alert('Elige un archivo primero.'); return; }
+  try{
+    const text = await readText(chosenFile);
+    let arr = [];
+    if(chosenFile.name.toLowerCase().endsWith('.json')){
+      arr = JSON.parse(text);
+      if(!Array.isArray(arr)) throw new Error('JSON debe ser un array');
+    }else{
+      const delim = detectDelimiter(text.slice(0, 2000));
+      const rows = parseCSVRaw(text, delim);
+      const parsed = toQuestions(rows);
+      const errs = parsed.filter(x => x.__error);
+      if(errs.length){
+        const lines = errs.slice(0,8).map(e => `Fila ${e.row}: respuesta="${e.answer}"`);
+        log('Algunas filas no cumplen formato (se ignoran):\n'+lines.join('\n')+'\n\nSi quieres, corrige esas filas y vuelve a importar.');
+      }
+      arr = parsed.filter(x => !x.__error);
+      if(arr.length===0) throw new Error('Todas las filas tenían errores.');
+    }
+    const limit = parseInt($('#limit').value||'0',10);
+    const finalArr = (limit>0) ? arr.slice(0, limit) : arr;
+    localStorage.setItem('quiz-upload', JSON.stringify(finalArr));
+    log('Preguntas cargadas correctamente. Redirigiendo a index…');
+    location.href = 'index.html?uploaded=1';
+  }catch(err){
+    console.error(err);
+    log('<span class="bad">Error: '+err.message+'</span>');
+    alert('No se pudo procesar el archivo. ' + err.message);
+  }
+});
+</script>
+</body>
+</html>

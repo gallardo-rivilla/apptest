@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Resultados</title>
+<link rel="stylesheet" href="style.css"/>
+<style>
+:root{--ok:#22c55e;--ko:#ef4444;--muted:#94a3b8}
+.stats-wrap{max-width:1000px;margin:20px auto;padding:12px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}
+.stat{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center}
+.stat h3{font-size:.9rem;margin:0 0 .5rem 0;opacity:.8}
+.big{font-size:2rem;font-weight:700}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin-top:14px}
+.score{display:flex;align-items:center;gap:18px}
+#donut{width:140px;height:140px}
+.badge-ok{color:var(--ok)} .badge-ko{color:var(--ko)}
+.fallos-list{margin-top:10px;display:grid;gap:10px}
+.fallo{border:1px dashed var(--border);border-radius:12px;padding:12px}
+.fallo .head{display:flex;justify-content:space-between;gap:8px}
+.fallo .q{font-weight:600}
+a.btn-link{padding:6px 10px;border:1px solid var(--border);border-radius:10px;text-decoration:none}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.score .label{font-size:1.2rem;font-weight:700}
+.note{font-size:2.4rem;font-weight:800}
+</style>
+</head>
+<body>
+<script>
+// restore theme
+try{const t=localStorage.getItem('quiz-theme'); if(t) document.documentElement.setAttribute('data-theme', t);}catch{}
+</script>
+<div class="stats-wrap">
+  <div class="topbar">
+    <h1>Resultados</h1>
+    <a class="btn-link" id="backBtn" href="index.html#review=1">← Volver al test</a>
+  </div>
+  <div id="meta" class="card"></div>
+  <div class="stats-grid">
+    <div class="stat"><h3>Total</h3><div class="big" id="tot"></div></div>
+    <div class="stat"><h3>Correctas</h3><div class="big badge-ok" id="ok"></div></div>
+    <div class="stat"><h3>Incorrectas</h3><div class="big badge-ko" id="ko"></div></div>
+    <div class="stat"><h3>Sin responder</h3><div class="big" id="nr"></div></div>
+  </div>
+  <div class="card score">
+    <canvas id="donut" width="140" height="140"></canvas>
+    <div>
+      <div class="label">Puntuación</div>
+      <div class="note"><span id="score"></span> / 10</div>
+      <div style="opacity:.8">Regla: +1 por acierto, −0,33 por fallo.</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2 style="margin:0 0 10px 0">Fallos</h2>
+    <div id="fallos" class="fallos-list"></div>
+  </div>
+</div>
+<script>
+function drawDonut(ok, ko, nr){
+  const c=document.getElementById('donut'); const ctx=c.getContext('2d');
+  const total = Math.max(1, ok+ko+nr); let start=-Math.PI/2;
+  const seg = (v,color)=>{ const ang = v/total * Math.PI*2; ctx.beginPath(); ctx.moveTo(70,70); ctx.arc(70,70,70,start,start+ang); ctx.closePath(); ctx.fillStyle=color; ctx.fill(); start+=ang; };
+  ctx.clearRect(0,0,140,140);
+  seg(ok,'#22c55e'); seg(ko,'#ef4444'); seg(nr,'#94a3b8');
+  // hole
+  ctx.globalCompositeOperation='destination-out'; ctx.beginPath(); ctx.arc(70,70,40,0,Math.PI*2); ctx.fill(); ctx.globalCompositeOperation='source-over';
+}
+(function(){
+  const raw = localStorage.getItem('quiz-result');
+  if(!raw){ document.getElementById('meta').textContent='No hay resultados guardados.'; return; }
+  const r = JSON.parse(raw);
+  const d = new Date(r.timestamp);
+  const mm = s=> String(s).padStart(2,'0');
+  const elapsed = r.elapsedSec || 0;
+  const min = Math.floor(elapsed/60), sec = elapsed%60;
+  document.getElementById('meta').innerHTML = `Generado: ${mm(d.getDate())}/${mm(d.getMonth()+1)}/${d.getFullYear()}, ${mm(d.getHours())}:${mm(d.getMinutes())}:${mm(d.getSeconds())} · Tiempo empleado: ${mm(min)}:${mm(sec)}`;
+  tot.textContent = r.totals.total;
+  ok.textContent = r.totals.correct;
+  ko.textContent = r.totals.wrong;
+  nr.textContent = r.totals.unanswered;
+  score.textContent = (r.score10||0).toFixed(2);
+  drawDonut(r.totals.correct, r.totals.wrong, r.totals.unanswered);
+  const fallos = (r.rows||[]).filter(x=> x.chosen && x.chosen!==x.correct);
+  const cont = document.getElementById('fallos');
+  if(!fallos.length){ cont.innerHTML = '<div style="opacity:.8">Ningún fallo. Limpio como una patena.</div>'; }
+  else{
+    cont.innerHTML = '';
+    fallos.forEach(item=>{
+      const div = document.createElement('div'); div.className='fallo';
+      const url = `index.html#review=1&q${item.num}`;
+      div.innerHTML = `
+        <div class="head"><div>#${item.num}</div><a class="btn-link" href="${url}">Ver en el test ↗</a></div>
+        <div class="q">${item.question}</div>
+        <div style="margin-top:6px"><b>Tu respuesta:</b> ${item.chosen}) ${item.chosen_text || ''}</div>
+        <div><b>Correcta:</b> ${item.correct}) ${item.correct_text || ''}</div>`;
+      cont.appendChild(div);
+    });
+  }
+  // ensure back link keeps review
+  document.getElementById('backBtn').setAttribute('href','index.html#review=1');
+})();
+</script>
+</body>
+</html>

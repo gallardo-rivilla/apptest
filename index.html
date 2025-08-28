@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Test Interactivo · v7</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="sidebar" id="sidebar" aria-label="Índice de preguntas" aria-hidden="true">
+    <div class="side-head">
+      <div class="side-title">Preguntas</div>
+      <button class="themebtn" id="closeSide" aria-label="Cerrar índice">✕</button>
+    </div>
+    <div class="side-controls">
+      <button class="chip active" data-filter="all">Todas</button>
+      <button class="chip" data-filter="pending">Pend.</button>
+      <button class="chip" data-filter="answered">Resp.</button>
+      <button class="chip" data-filter="wrong">Fall.</button>
+    </div>
+    <div class="legend">
+      <span><span class="dot d-none"></span> Sin responder</span>
+      <span><span class="dot d-ans"></span> Respondida</span>
+      <span><span class="dot d-ok"></span> Acierto</span>
+      <span><span class="dot d-ko"></span> Error</span>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="backdrop" id="backdrop"></div>
+
+  <div class="main">
+    <header>
+      <div class="wrap">
+        <div class="row">
+          <div class="left">
+            <div class="hamb" id="openSide">☰ Índice</div>
+            <div class="title">Test Interactivo · v7</div>
+            <div class="progress"><div id="bar" class="bar"></div></div>
+            <div class="pill" id="status">0/0 respondidas</div>
+          </div>
+          <div class="right">
+            <button class="themebtn" id="theme">Modo claro</button>
+            <span class="pill" id="timer">⏱ 00:00 / 00:00</span>
+            <label class="pill" style="display:flex;gap:8px;align-items:center">Tamaño
+              <button class="tbtn" id="smaller" title="Reducir tamaño">−</button>
+              <button class="tbtn" id="bigger" title="Aumentar tamaño">+</button>
+            </label>
+            <label class="pill" style="display:flex;gap:8px;align-items:center">Preguntas
+              <select id="pageSize" class="pill" style="margin-left:6px;background:none;border:none;padding:0 4px;">
+                <option value="1" selected>1</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+              </select>
+            </label>
+            <label class="pill" style="display:flex;gap:8px;align-items:center">Fuente
+              <select id="fontSel" class="pill" style="margin-left:6px;background:none;border:none;padding:0 4px;">
+                <option value="system-ui, Segoe UI, Roboto, Arial, Helvetica, sans-serif">Sistema</option>
+                <option value="Arial, Helvetica, sans-serif" selected>Arial</option>
+                <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                <option value="'Courier New', Courier, Consolas, Monaco, Menlo, monospace">Monoespaciada</option>
+                <option value="Verdana, Geneva, sans-serif">Verdana</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div id="qs" class="stack"></div>
+      <div id="actions" class="actions">
+        <div class="actions-inner">
+          <div class="group">
+            <button id="prev" class="btn-icon">⬅️ Anterior</button>
+            <button id="next" class="btn-icon">Siguiente ➡️</button>
+            <button id="reveal" class="btn-icon">👁️ Mostrar solución</button>
+          </div>
+          <div class="group">
+            <button id="reset" class="btn-icon">↺ Reiniciar</button>
+            <button id="finish" class="primary btn-icon">🏁 Finalizar</button>
+          </div>
+        </div>
+      </div>
+      <div id="sum" class="card" style="display:none"></div>
+    </main>
+  </div>
+
+  <!-- Contenedor de datos (lo rellenará preload.js si vienes de load.html) -->
+  <script id="data" type="application/json"></script>
+
+  <!-- Muy importante: incluir preload.js ANTES de script.js -->
+  <script src="preload.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
